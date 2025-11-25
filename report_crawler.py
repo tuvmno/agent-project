@@ -30,9 +30,11 @@ DB_CONFIG = {
     "password": os.getenv("POSTGRES_PASSWORD")
 }
 
+# DB 연결 함수
 def get_db_connection():
     return psycopg2.connect(**DB_CONFIG)
 
+# PDF 다운로드 함수
 def download_pdf(url, filename):
     try:
         response = requests.get(
@@ -55,13 +57,14 @@ def crawl_yesterday_reports():
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # 1. 어제 날짜 계산 (형식: YY.MM.DD)
+        
+        # 어제 날짜 계산 (형식: YY.MM.DD)
         yesterday = datetime.now() - timedelta(days=1)
         target_date_str = yesterday.strftime("%y.%m.%d")
         # 저장용 날짜 형식 (YYYY-MM-DD)
         db_date_str = yesterday.strftime("%Y-%m-%d")
         
-        logger.info(f"🚀 [{target_date_str}] 일자 리포트 수집 시작...")
+        logger.info(f"[{target_date_str}] 일자 리포트 수집 시작...")
 
         page = 1
         is_collecting = True
@@ -98,13 +101,23 @@ def crawl_yesterday_reports():
                         is_collecting = False
                         break
                     
-                    # 어제 날짜의 리포트만 처리 
-                    stock_name = cols[0].text.strip()
+
+  
+                    # 종목명
+                    stock_td = cols[0]
+                    stock_name = stock_td.text.strip()
                     
+                    # 종목코드
+                    stock_link = stock_td.find('a')['href']
+                    code_match = re.search(r'code=(\d+)', stock_link)
+                    stock_code = code_match.group(1) if code_match else ""
+                    
+                    # 제목 
                     title_tag = cols[1].find("a")
                     if not title_tag: continue
                     title = title_tag.text.strip()
                     
+                    # 증권사
                     broker = cols[2].text.strip()
                     
                     # PDF 링크 추출
@@ -131,9 +144,9 @@ def crawl_yesterday_reports():
                         # 다운로드 및 저장
                         if download_pdf(pdf_url, filename):
                             cur.execute("""
-                                INSERT INTO reports (title, stock_name, broker, date, pdf_url, file_path)
-                                VALUES (%s, %s, %s, %s, %s, %s)
-                            """, (title, stock_name, broker, db_date_str, pdf_url, filename))
+                                INSERT INTO reports (title, stock_name, stock_code, broker, date, pdf_url, file_path)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                            """, (title, stock_name, stock_code, broker, db_date_str, pdf_url, filename))
                             conn.commit()
                             logger.info(f"수집: {stock_name} - {title}")
                     else:
