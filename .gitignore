@@ -5,3 +5,5 @@
 __pycache__/
 *.pyc
 .conda/
+logs/
+df_init/
