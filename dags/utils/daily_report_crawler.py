@@ -59,7 +59,7 @@ def crawl_yesterday_reports():
         
         
         # 어제 날짜 계산 (형식: YY.MM.DD)
-        yesterday = datetime.now() - timedelta(days=1)
+        yesterday = datetime.now() - timedelta(days=2)
         target_date_str = yesterday.strftime("%y.%m.%d")
         # 저장용 날짜 형식 (YYYY-MM-DD)
         db_date_str = yesterday.strftime("%Y-%m-%d")
