@@ -5,6 +5,8 @@ import sys
 import os
 from utils.daily_report_crawler import crawl_yesterday_reports
 from utils.enrichment import process_data
+import pendulum
+kst = pendulum.timezone("Asia/Seoul")
 
 # utils 폴더 경로 추가
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -20,7 +22,7 @@ with DAG(
     default_args=default_args,
     description='증권사 리포트 수집 및 AI 요약 파이프라인',
     schedule_interval='0 7 * * *',  # 매일 아침 7시
-    start_date=datetime(2023, 1, 1),
+    start_date=datetime(2023, 1, 1, tzinfo=kst), # 한국 시간대 설정
     catchup=False,
     tags=['finance', 'etl', 'ai'],
 ) as dag:

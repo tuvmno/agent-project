@@ -1,22 +1,32 @@
 networks:
   default:
-    name: my_project_network
+    name: financeial_report_analysis_network
 
+# Airflow 공통 설정
 x-airflow-common: &x-airflow-common
   build: .
   environment:
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_AIRFLOW_DB}
     AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+    AIRFLOW__CORE__DEFAULT_TIMEZONE: "Asia/Seoul"
     AIRFLOW_UID: 50000
+    # DB 연결 정보
     POSTGRES_HOST: ${POSTGRES_HOST}
     POSTGRES_PORT: ${POSTGRES_PORT}
     POSTGRES_DB: ${POSTGRES_DB}
     POSTGRES_USER: ${POSTGRES_USER}
     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    # Airflow 계정 정보
     AIRFLOW_ADMIN_USER: ${AIRFLOW_ADMIN_USER}
     AIRFLOW_ADMIN_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD}
     AIRFLOW_ADMIN_EMAIL: ${AIRFLOW_ADMIN_EMAIL}
+    # API 키
+    GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+    # MinIO(S3) 접속 정보
+    MINIO_ENDPOINT: "http://minio:9000"
+    MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+    MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
   volumes:
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs
@@ -24,8 +34,9 @@ x-airflow-common: &x-airflow-common
     - ./pdf_reports:/opt/airflow/pdf_reports
 
 services:
+  # 데이터베이스
   postgres:
-    image: postgres:15
+    image: pgvector/pgvector:pg16  # 👈 벡터 DB 기능이 포함된 이미지
     container_name: my_postgres
     restart: unless-stopped
     environment:
@@ -44,6 +55,22 @@ services:
       timeout: 5s
       retries: 5
 
+  # 데이터 레이크 (MinIO 추가)
+  minio:
+    image: minio/minio
+    container_name: my_minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "9000:9000" # API 포트 (코드에서 접속)
+      - "9001:9001" # 웹 콘솔 포트 (브라우저 접속)
+    volumes:
+      - minio_data:/data
+
+  # 채팅 로그 저장소
   mongo:
     image: mongo:6.0
     container_name: my_mongo
@@ -56,6 +83,7 @@ services:
     volumes:
       - mongo_data:/data/db
 
+  # 캐시
   redis:
     image: redis:7
     container_name: my_redis
@@ -66,6 +94,7 @@ services:
     volumes:
       - redis_data:/data
 
+  # Airflow 서비스들
   airflow-webserver:
     <<: *x-airflow-common
     container_name: airflow_webserver
@@ -111,4 +140,4 @@ volumes:
   postgres_data:
   mongo_data:
   redis_data:
-  
+  minio_data:
