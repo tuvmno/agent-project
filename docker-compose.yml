@@ -12,7 +12,7 @@ x-airflow-common: &x-airflow-common
     AIRFLOW__CORE__DEFAULT_TIMEZONE: "Asia/Seoul"
     AIRFLOW_UID: 50000
     # DB 연결 정보
-    POSTGRES_HOST: ${POSTGRES_HOST}
+    POSTGRES_HOST: my_postgres
     POSTGRES_PORT: ${POSTGRES_PORT}
     POSTGRES_DB: ${POSTGRES_DB}
     POSTGRES_USER: ${POSTGRES_USER}
@@ -24,9 +24,10 @@ x-airflow-common: &x-airflow-common
     # API 키
     GOOGLE_API_KEY: ${GOOGLE_API_KEY}
     # MinIO(S3) 접속 정보
-    MINIO_ENDPOINT: "http://minio:9000"
-    MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
-    MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+    MINIO_ENDPOINT: http://minio:9000
+    MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+    MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+    BUCKET_NAME: ${BUCKET_NAME}
   volumes:
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs
@@ -40,6 +41,8 @@ services:
     container_name: my_postgres
     restart: unless-stopped
     environment:
+      TZ: Asia/Seoul
+      PGTZ: Asia/Seoul
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
