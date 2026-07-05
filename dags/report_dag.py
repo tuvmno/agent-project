@@ -9,6 +9,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from utils.daily_report_crawler import crawl_reports
 from utils.enrichment import process_data
+from utils.content_extractor import process_pending_content
 import pendulum
 
 # 한국 시간대 설정
@@ -37,11 +38,10 @@ with DAG(
     )
 
     # 태스크 2: 가공 & 요약 (Enrichment)
-    # task_enrich = PythonOperator(
-    #     task_id='enrich_reports',
-    #     python_callable=process_data
-    # )
+    task_extract_content = PythonOperator(
+        task_id='extract_report_content',
+        python_callable=process_pending_content
+    )
 
     # 순서 정의: 수집이 성공해야 -> 가공을 시작한다
-    # task_crawl >> task_enrich
-    task_crawl
+    task_crawl >> task_extract_content

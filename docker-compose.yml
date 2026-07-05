@@ -2,6 +2,24 @@ networks:
   default:
     name: financeial_report_analysis_network
 
+x-app-env: &app-env
+  PYTHONUNBUFFERED: "1"
+  POSTGRES_HOST: my_postgres
+  POSTGRES_PORT: ${POSTGRES_PORT}
+  POSTGRES_DB: ${POSTGRES_DB}
+  POSTGRES_USER: ${POSTGRES_USER}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+  LANGSMITH_TRACING_V2: ${LANGSMITH_TRACING_V2}
+  LANGSMITH_ENDPOINT: ${LANGSMITH_ENDPOINT}
+  LANGSMITH_API_KEY: ${LANGSMITH_API_KEY}
+  LANGSMITH_PROJECT: ${LANGSMITH_PROJECT}
+  MINIO_ENDPOINT: http://minio:9000
+  MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+  MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+  BUCKET_NAME: ${BUCKET_NAME}
+  OLLAMA_BASE_URL: http://ollama:11434
+
 # Airflow 공통 설정
 x-airflow-common: &x-airflow-common
   build: .
@@ -34,7 +52,31 @@ x-airflow-common: &x-airflow-common
     - ./plugins:/opt/airflow/plugins
     - ./pdf_reports:/opt/airflow/pdf_reports
 
+x-app-common: &x-app-common
+  environment: *app-env
+  volumes:
+    - ./:/app
+  working_dir: /app
+
 services:
+  # 로컬 LLM 모델 실행용
+  ollama:
+    image: ollama/ollama:latest
+    container_name: my_ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+
   # 데이터베이스
   postgres:
     image: pgvector/pgvector:pg16  # 👈 벡터 DB 기능이 포함된 이미지
@@ -73,6 +115,24 @@ services:
     volumes:
       - minio_data:/data
 
+  minio-init:
+    image: minio/mc
+    container_name: minio_init
+    depends_on:
+      - minio
+    restart: "no"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      BUCKET_NAME: ${BUCKET_NAME}
+    entrypoint: >
+      /bin/sh -c "
+        until /usr/bin/mc alias set local http://minio:9000 \"$${MINIO_ROOT_USER}\" \"$${MINIO_ROOT_PASSWORD}\"; do
+          sleep 2;
+        done;
+        /usr/bin/mc mb --ignore-existing local/$${BUCKET_NAME};
+      "
+
   # 채팅 로그 저장소
   mongo:
     image: mongo:6.0
@@ -96,6 +156,35 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+
+  # FastAPI 백엔드
+  backend:
+    <<: *x-app-common
+    build: .
+    image: agent-project-app:latest
+    container_name: agent_backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    command: python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Streamlit 프론트엔드
+  frontend:
+    <<: *x-app-common
+    image: agent-project-app:latest
+    container_name: agent_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      <<: *app-env
+      BACKEND_URL: http://backend:8000/ask
+    ports:
+      - "8501:8501"
+    command: python -m streamlit run app.py --server.port 8501 --server.address 0.0.0.0 --server.headless true --browser.gatherUsageStats false
 
   # Airflow 서비스들
   airflow-webserver:
@@ -144,3 +233,4 @@ volumes:
   mongo_data:
   redis_data:
   minio_data:
+  ollama_data:

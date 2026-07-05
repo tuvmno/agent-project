@@ -10,6 +10,7 @@ import boto3
 from botocore.client import Config
 import io
 
+
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
@@ -58,10 +59,7 @@ def upload_to_minio(s3, url, filename):
     try:
         response = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15, stream=True)
         if response.status_code == 200:
-            file_obj = io.BytesIO(response.content)
-            
-            print(file_obj, os.getenv("BUCKET_NAME"), filename)
-            
+            file_obj = io.BytesIO(response.content)            
             s3.upload_fileobj(file_obj, os.getenv("BUCKET_NAME"), filename)
             return True
         return False

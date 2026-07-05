@@ -1,9 +1,12 @@
 # Environments
 .env
+.venv/
+venv/
 
 # Python
 __pycache__/
 *.pyc
 .conda/
 logs/
+*.log
 df_init/
